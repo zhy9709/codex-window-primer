@@ -13,7 +13,7 @@ app-server method, so a future Codex release may require an update.
 Prerequisites: Python 3.10+, Codex CLI on `PATH`, and `codex login` completed.
 
 ```bash
-git clone <repository-url> codex-window-primer
+git clone https://github.com/zhy9709/codex-window-primer.git
 cd codex-window-primer
 python3 -m venv .venv
 .venv/bin/pip install .
@@ -59,4 +59,3 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 ## License
 
 MIT
-

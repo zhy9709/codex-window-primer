@@ -12,9 +12,12 @@ license = "MIT"
 authors = [{name = "Xiaopai"}]
 keywords = ["openai", "codex", "quota", "automation"]
 
+[project.urls]
+Homepage = "https://github.com/zhy9709/codex-window-primer"
+Issues = "https://github.com/zhy9709/codex-window-primer/issues"
+
 [project.scripts]
 codex-window-primer = "codex_window_primer.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
