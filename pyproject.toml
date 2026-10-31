@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "codex-window-primer"
+version = "0.1.0"
+description = "Start an idle Codex rolling usage window before you need it"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [{name = "Xiaopai"}]
+keywords = ["openai", "codex", "quota", "automation"]
+
+[project.scripts]
+codex-window-primer = "codex_window_primer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
