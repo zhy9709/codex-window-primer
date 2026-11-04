@@ -117,3 +117,27 @@ def prime(codex: str = "codex", timeout: int = 120) -> None:
                             timeout=timeout)
     if result.returncode:
         raise RuntimeError((result.stderr or result.stdout)[-500:].strip() or "primer failed")
+
+
+def verify_primed(codex: str = "codex", attempts: int = 3,
+                  delay: float = 2, query_timeout: int = 20) -> dict[str, Any]:
+    """Return refreshed limits once the primary window reports non-zero usage.
+
+    Each query and the number of retries are bounded so callers used by cron or
+    systemd cannot wait indefinitely.  A zero reading is retried because quota
+    accounting may lag slightly behind the primer request.
+    """
+    last_error: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            limits = read_rate_limits(codex, timeout=query_timeout)
+            primary = limits.get("primary") or {}
+            if float(primary.get("usedPercent") or 0) > 0:
+                return limits
+            last_error = RuntimeError("primary usage is still 0%")
+        except (OSError, RuntimeError, TimeoutError, ValueError, KeyError) as exc:
+            last_error = exc
+        if attempt + 1 < attempts:
+            time.sleep(delay)
+    detail = str(last_error) if last_error else "no verification attempts made"
+    raise RuntimeError(f"primer could not be verified after {attempts} attempts: {detail}")

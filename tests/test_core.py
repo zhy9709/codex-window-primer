@@ -1,6 +1,10 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
-from codex_window_primer.core import decision
+from codex_window_primer.cli import main
+from codex_window_primer.core import decision, load_state, verify_primed
 from codex_window_primer.timer import parse_interval, render_timer
 
 
@@ -27,6 +31,61 @@ class TimerTests(unittest.TestCase):
             parse_interval("1m")
 
 
+class VerificationTests(unittest.TestCase):
+    @patch("codex_window_primer.core.time.sleep")
+    @patch("codex_window_primer.core.read_rate_limits")
+    def test_verified_success(self, read_limits, sleep):
+        read_limits.return_value = {"primary": {"usedPercent": 1}}
+        self.assertEqual(verify_primed("codex"), read_limits.return_value)
+        read_limits.assert_called_once_with("codex", timeout=20)
+        sleep.assert_not_called()
+
+    @patch("codex_window_primer.core.time.sleep")
+    @patch("codex_window_primer.core.read_rate_limits")
+    def test_persistent_zero_fails(self, read_limits, sleep):
+        read_limits.return_value = {"primary": {"usedPercent": 0}}
+        with self.assertRaisesRegex(RuntimeError, "could not be verified"):
+            verify_primed("codex")
+        self.assertEqual(read_limits.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
+    @patch("codex_window_primer.core.time.sleep")
+    @patch("codex_window_primer.core.read_rate_limits")
+    def test_transient_errors_are_retried(self, read_limits, sleep):
+        expected = {"primary": {"usedPercent": 0.5}}
+        read_limits.side_effect = [TimeoutError("late"), expected]
+        self.assertEqual(verify_primed("codex"), expected)
+        self.assertEqual(read_limits.call_count, 2)
+        sleep.assert_called_once_with(2)
+
+
+class CheckCommandTests(unittest.TestCase):
+    @patch("codex_window_primer.cli.prime")
+    @patch("codex_window_primer.cli.verify_primed")
+    @patch("codex_window_primer.cli.read_rate_limits")
+    def test_state_saved_only_after_verified_success(self, read_limits, verify, primer):
+        read_limits.return_value = {"primary": {"usedPercent": 0, "resetsAt": 10}}
+        verify.return_value = {"primary": {"usedPercent": 1, "resetsAt": 20}}
+        with TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            self.assertEqual(main(["--state-file", str(state_path), "check"]), 0)
+            self.assertEqual(load_state(state_path)["last_reset_at"], 20)
+        primer.assert_called_once()
+
+    @patch("codex_window_primer.cli.prime")
+    @patch("codex_window_primer.cli.verify_primed")
+    @patch("codex_window_primer.cli.read_rate_limits")
+    def test_verification_failure_leaves_state_unchanged(self, read_limits, verify, primer):
+        read_limits.return_value = {"primary": {"usedPercent": 0, "resetsAt": 10}}
+        verify.side_effect = RuntimeError("still zero")
+        with TemporaryDirectory() as directory:
+            state_path = Path(directory) / "state.json"
+            state_path.write_text('{"last_primed_at": 1}\n', encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "still zero"):
+                main(["--state-file", str(state_path), "check", "--min-prime-interval", "0"])
+            self.assertEqual(load_state(state_path), {"last_primed_at": 1})
+        primer.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()
-

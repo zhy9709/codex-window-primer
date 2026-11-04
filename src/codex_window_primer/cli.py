@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 
 from .core import (decision, default_state_file, load_state, prime,
-                   read_rate_limits, save_state, single_instance)
+                   read_rate_limits, save_state, single_instance, verify_primed)
 from .timer import install
 
 
@@ -53,8 +53,15 @@ def main(argv: list[str] | None = None) -> int:
         payload.update({"wouldPrime": should_prime, "reason": reason})
         if should_prime and not args.dry_run:
             prime(args.codex)
+            verified_limits = verify_primed(args.codex)
+            verified_primary = verified_limits.get("primary") or {}
+            payload.update({
+                "usedPercent": float(verified_primary.get("usedPercent") or 0),
+                "leftPercent": 100 - float(verified_primary.get("usedPercent") or 0),
+                "resetsAt": int(verified_primary.get("resetsAt") or 0),
+            })
             save_state(args.state_file, {"version": 1, "last_primed_at": now,
-                                         "last_reset_at": reset})
+                                         "last_reset_at": payload["resetsAt"]})
             payload["primed"] = True
     print(json.dumps(payload))
     return 0
