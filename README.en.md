@@ -36,6 +36,16 @@ Other useful choices are `30m` (more responsive) and `15m` (usually
 unnecessary). The default `1h` means the window starts at most 59 minutes after
 it becomes fresh, while making only 24 lightweight checks per day.
 
+For a precise follow-up shortly after the server-reported reset (while keeping
+the hourly poll as a fallback):
+
+```bash
+codex-window-primer install-timer --interval 1h --reset-follow-up --reset-delay 30
+```
+
+The one-shot systemd timer is updated idempotently from `resetsAt`. Missing,
+stale, or implausible timestamps more than seven days away are ignored.
+
 For cron instead:
 
 ```cron
@@ -48,8 +58,13 @@ For cron instead:
 codex-window-primer status
 codex-window-primer check --dry-run
 codex-window-primer check
+codex-window-primer check --model gpt-5.1-codex-mini
 codex-window-primer install-timer --interval 30m
 ```
+
+Without `--model`, the primer uses the Codex CLI's current default. Check JSON
+preserves explicit `before` and verified `after` usage/reset evidence plus
+`modelRequested`; dry runs and skipped primers do not fabricate an `after`.
 
 State is stored in `$XDG_STATE_HOME/codex-window-primer/state.json` (normally
 `~/.local/state/...`). OAuth tokens remain in Codex's own auth file and are

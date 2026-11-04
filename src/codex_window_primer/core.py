@@ -111,12 +111,17 @@ def decision(used_percent: float, state: dict[str, Any], now: int,
     return True, "fresh-window"
 
 
-def prime(codex: str = "codex", timeout: int = 120) -> None:
-    result = subprocess.run([codex, "exec", "--skip-git-repo-check", "--sandbox", "read-only",
-                             "Reply with exactly OK."], text=True, capture_output=True,
+def prime(codex: str = "codex", timeout: int = 120,
+          model: str | None = None) -> None:
+    command = [codex, "exec", "--skip-git-repo-check", "--sandbox", "read-only"]
+    if model:
+        command.extend(["--model", model])
+    command.append("Reply with exactly OK.")
+    result = subprocess.run(command, text=True, capture_output=True,
                             timeout=timeout)
     if result.returncode:
-        raise RuntimeError((result.stderr or result.stdout)[-500:].strip() or "primer failed")
+        # Provider output can contain account details; keep scheduled-task logs terse.
+        raise RuntimeError(f"primer request failed (Codex exit status {result.returncode})")
 
 
 def verify_primed(codex: str = "codex", attempts: int = 3,
